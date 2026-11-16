@@ -13,7 +13,7 @@ Supervisor: Ms Sapna Kumarapathirage.
 | M1 | WP2 | Data loaders, user-level split, baselines, replay simulator, precision-per-byte metrics, budget sweep | Done |
 | M2 | WP2 | Real coffee-shop and Retailrocket data: loader checks, data profile, frozen test split, baselines on validation data | Done |
 | M3 | WP3 | LSTM and small Transformer in PyTorch, temperature scaling, ONNX export, latency benchmark (NFR1) | Built; first single-seed runs on real data; tuning and five-seed runs outstanding |
-| M4 | WP4 | Next: gate linked to the token bucket, FastAPI middleware, Redis key scheme, prefetch log, admin API (FR2 to FR5, NFR2, NFR3) | |
+| M4 | WP4 | Budget-linked gate built and tested in the simulator. Next: FastAPI middleware, Redis key scheme, prefetch log, admin API (FR2 to FR5, NFR2, NFR3) | |
 | M5 | WP5 | Demo app, measured response sizes, React dashboard, Docker Compose, Locust load test (O4) | |
 | M6 | WP6 | RQ1 to RQ3 experiments on the frozen test split, five seeds, 95% confidence intervals | |
 
@@ -31,6 +31,7 @@ src/prefetchcache/
                  baselines.py  popularity, first-order Markov
   policy/        gate.py       confidence threshold and top-k
                  budget.py     token-bucket byte budget
+                 linked.py     budget-linked gate: confidence per byte against a price set by bucket fill
                  onnx_predictor.py  serves an exported model through ONNX Runtime
   models/        nets.py       LSTM and causal Transformer, same inputs for both
                  windows.py    left-padded training windows (last 20 requests)
@@ -102,6 +103,18 @@ Coffee shop, 10% user sample, one model seed, ungated top-1, unlimited budget (1
 
 Retailrocket, all users, first-order Markov: ungated top-1 precision is 0.04, because the next item out of tens of thousands is rarely predictable. A 0.7 gate raises precision to 0.27 and cuts wasted bytes from 805 MB to 3 MB, at almost no gain in hit ratio.
 
+Budget-linked gate against ungated top-1 with the same LSTM (coffee shop, same run):
+
+| Budget | Useful per MB, ungated | Useful per MB, linked | Wasted MB, ungated | Wasted MB, linked | Hit ratio, ungated | Hit ratio, linked |
+|---|---|---|---|---|---|---|
+| 100% | 77.0 | 77.1 | 262.6 | 261.5 | 0.671 | 0.671 |
+| 50% | 108.2 | 112.8 | 145.9 | 138.3 | 0.531 | 0.543 |
+| 25% | 145.1 | 150.5 | 81.1 | 74.6 | 0.390 | 0.394 |
+| 10% | 172.0 | 183.4 | 33.9 | 30.5 | 0.243 | 0.245 |
+| 5% | 171.5 | 189.7 | 25.0 | 16.6 | 0.178 | 0.182 |
+
+The linked gate admits a candidate only if its probability per byte is at least a price that rises while the token bucket is below half full and falls while it is above. It matches ungated prefetching when the budget is loose and gains 4 to 11% in useful prefetches per MB as the budget tightens, without losing hit ratio. Fixed thresholds of 0.5 and 0.7 do not achieve this: they lose hit ratio at loose budgets.
+
 Full tables are in `results/<dataset>/`.
 
 ## Metric definitions
@@ -137,4 +150,4 @@ These are not fixed in the proposal deck. The code uses the proposed value for e
 - Dropping repeated pages removes 56% of coffee-shop requests. Keeping them would make prediction easier and is a decision to confirm.
 - Response sizes are a placeholder distribution until the demo app provides measured sizes.
 - Markov probabilities on Retailrocket are overconfident (precision 0.27 at a 0.7 gate) because many transitions are seen only a few times.
-- The gate and the token bucket are applied one after the other. With a tight bucket only small responses fit, which raises useful prefetches per MB for the ungated policy too. On the coffee-shop data a fixed gate gains little per MB over ungated prefetching at the same budget. Linking the gate to the budget (WP4) has to account for this, for example by ranking candidates by confidence per byte.
+- With a tight token bucket only small responses fit, which raises useful prefetches per MB for the ungated policy too. A fixed confidence threshold therefore gains little per MB over ungated prefetching at the same budget. The budget-linked gate is the response to this; its step size and target fill are not tuned yet.
