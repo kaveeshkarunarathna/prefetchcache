@@ -94,6 +94,11 @@ def install_prefetchcache(app: FastAPI, *, store, predictors, vocab, model, poli
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    @admin.post("/reset")
+    async def reset() -> dict:
+        engine.reset_stats()
+        return engine.stats()
+
     @admin.get("/log")
     async def prefetch_log(limit: int = 100) -> list[dict]:
         return list(engine.log)[-limit:]
