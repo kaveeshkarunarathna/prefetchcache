@@ -218,3 +218,17 @@ def test_redis_store_round_trip_and_expiry():
         assert (await get(client, engine, "/pages/2", "a")).headers["x-prefetchcache"] == "hit"
 
     run(scenario())
+
+
+def test_concurrent_requests_do_not_prefetch_the_same_response_twice():
+    async def scenario():
+        table = {1: [(3, 0.9)], 2: [(3, 0.9)]}
+        client, engine, _, _ = build(predictors={"fixed": Fixed(table)})
+        await warm(client, engine)
+        await asyncio.gather(*(client.get(f"/pages/{n}", headers={"x-session-id": "a"}) for n in (1, 2, 1, 2)))
+        await engine.drain()
+        stats = engine.stats()
+        assert stats["prefetches"] == 1
+        assert stats["prefetched_bytes"] == stats["useful_bytes"] + stats["wasted_bytes"] + stats["pending_bytes"]
+
+    run(scenario())

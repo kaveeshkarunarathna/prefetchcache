@@ -67,6 +67,7 @@ class PrefetchEngine:
         self._history: OrderedDict[str, deque[int]] = OrderedDict()
         self._sizes: dict[str, int] = {}  # response size per endpoint, learned from real responses
         self._pending: dict[str, _Pending] = {}
+        self._in_flight: set[str] = set()  # keys being prefetched right now
         self._tasks: set[asyncio.Task] = set()
 
     # ---- serving -------------------------------------------------------
@@ -115,7 +116,11 @@ class PrefetchEngine:
     async def drain(self) -> None:
         """Wait for running prefetches (tests and shutdown)."""
         while self._tasks:
-            await asyncio.gather(*list(self._tasks), return_exceptions=True)
+            running = [t for t in self._tasks if not t.done()]
+            if running:
+                await asyncio.wait(running)
+            else:
+                await asyncio.sleep(0)  # let finished tasks remove themselves
 
     # ---- prefetching ---------------------------------------------------
 
@@ -159,23 +164,26 @@ class PrefetchEngine:
                 break
             chosen += 1
             key = cache_key(session_id, endpoint)
-            if await self.store.get(key) is not None:
+            if key in self._in_flight or key in self._pending or await self.store.get(key) is not None:
                 self.metrics.already_cached += 1
                 continue
             if self.bucket is not None and not self.bucket.try_consume(size, now):
                 self.metrics.budget_skipped += 1
                 continue
+            self._in_flight.add(key)
             try:
                 body = await self.fetcher(endpoint)
+                actual = len(body)
+                if actual > size and self.bucket is not None:
+                    self.bucket.charge(actual - size, now)  # response grew since it was last seen
+                self._sizes[endpoint] = actual
+                await self.store.set(key, body, self.ttl)
             except Exception:
                 if self.bucket is not None:
-                    self.bucket.charge(-size, now)  # nothing was transferred: refund
+                    self.bucket.charge(-size, now)  # nothing was cached: refund
                 raise
-            actual = len(body)
-            if actual > size and self.bucket is not None:
-                self.bucket.charge(actual - size, now)  # response grew since it was last seen
-            self._sizes[endpoint] = actual
-            await self.store.set(key, body, self.ttl)
+            finally:
+                self._in_flight.discard(key)
             self.metrics.prefetches += 1
             self.metrics.prefetched_bytes += actual
             self._pending[key] = _Pending(session_id, endpoint, actual, now + self.ttl)
@@ -193,6 +201,13 @@ class PrefetchEngine:
             self.metrics.wasted_prefetches += 1
             self.metrics.wasted_bytes += pending.size
             self._record(pending, "wasted")
+
+    def reset_stats(self) -> None:
+        """Zero the counters and the log; cached data and configuration stay."""
+        self.metrics = Metrics()
+        self.errors = 0
+        self.log.clear()
+        self._pending.clear()
 
     def stats(self) -> dict:
         self._expire()
