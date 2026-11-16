@@ -22,6 +22,24 @@ from ..sim.replay import SimConfig, replay, uses_timestamps
 from .common import load_dataset
 from ..sim.sweep import DEFAULT_BUDGET_FRACTIONS, budget_sweep
 
+class MemoPredictor:
+    """Caches predictions by history, so each policy and budget reuses them."""
+
+    def __init__(self, inner):
+        self.inner, self.name, self._memo = inner, inner.name, {}
+
+    def predict(self, history, top_n=5):
+        key = (tuple(history[-self.window :]), top_n)
+        hit = self._memo.get(key)
+        if hit is None:
+            hit = self._memo[key] = self.inner.predict(history, top_n)
+        return hit
+
+    @property
+    def window(self) -> int:
+        return getattr(self.inner, "max_len", 1)
+
+
 REPORTED = ("useful_per_mb", "precision", "wasted_mb", "prefetched_mb", "hit_ratio")
 
 
@@ -34,12 +52,13 @@ def main() -> None:
     ap.add_argument("--thresholds", type=float, nargs="*", default=[0.3, 0.5, 0.7])
     ap.add_argument("--ttl", type=float, help="seconds with timestamps, requests otherwise")
     ap.add_argument("--min-count", type=int, default=5)
+    ap.add_argument("--user-sample", type=float, default=1.0, help="fraction of users to keep (development runs)")
     ap.add_argument("--models-dir", help="directory holding <dataset>/<model>/seed<N> ONNX exports")
-    ap.add_argument("--out", default="results/baselines")
+    ap.add_argument("--out", default="results")
     args = ap.parse_args()
 
     out_dir = Path(args.out) / args.dataset
-    data = load_dataset(args.dataset, args.path, args.min_count, args.out)
+    data = load_dataset(args.dataset, args.path, args.min_count, args.out, args.user_sample)
     vocab, train, val = data.vocab, data.train, data.val
     ttl = args.ttl if args.ttl is not None else (300.0 if uses_timestamps(val) else 5.0)
     config = SimConfig(ttl=ttl)
@@ -66,7 +85,9 @@ def main() -> None:
             from ..predictors.onnx_predictor import OnnxPredictor
 
             for kind in ("lstm", "transformer"):
-                predictors.append(OnnxPredictor(Path(args.models_dir) / args.dataset / kind / f"seed{seed}"))
+                model_dir = Path(args.models_dir) / args.dataset / kind / f"seed{seed}"
+                if model_dir.exists():
+                    predictors.append(MemoPredictor(OnnxPredictor(model_dir)))
         for pred in predictors:
             for policy in policies:
                 sweep = budget_sweep(val, pred, sizes, vocab.cacheable, policy, config, DEFAULT_BUDGET_FRACTIONS)
