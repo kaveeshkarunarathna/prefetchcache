@@ -1,0 +1,16 @@
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+  app:
+    build: .
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      POLICY: linked
+      BUDGET_BYTES_PER_SECOND: "300000"
+      BUDGET_BURST_BYTES: "600000"
+      TTL_SECONDS: "60"
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis

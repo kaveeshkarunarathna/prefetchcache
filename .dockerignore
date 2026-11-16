@@ -1,0 +1,5 @@
+data/
+artifacts*/
+results/
+.git/
+**/__pycache__/
