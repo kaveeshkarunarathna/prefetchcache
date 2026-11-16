@@ -4,3 +4,5 @@ __pycache__/
 # Datasets are not redistributed (coffee-shop data is GPL-2, Retailrocket is CC BY-NC-SA 4.0)
 data/raw/
 data/processed/
+# Trained models are rebuilt with prefetchcache.models.train
+artifacts/

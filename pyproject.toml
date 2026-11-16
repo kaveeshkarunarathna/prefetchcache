@@ -7,10 +7,11 @@ name = "prefetchcache"
 version = "0.1.0"
 description = "Confidence-gated, byte-budgeted server-side prefetching middleware and precision-per-byte evaluation"
 requires-python = ">=3.11"
-dependencies = ["numpy>=1.26", "pandas>=2.1"]
+dependencies = ["numpy>=1.26", "pandas>=2.1", "onnxruntime>=1.17"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+train = ["torch>=2.2", "onnx>=1.15"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -18,3 +19,4 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+filterwarnings = ["ignore::torch.jit.TracerWarning", "ignore::DeprecationWarning"]
