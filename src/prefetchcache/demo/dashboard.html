@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PrefetchCache dashboard</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#1b2430; --muted:#5d6b7c; --line:#dfe4ea; --used:#1f7a5a; --wasted:#b3401f; --pending:#8a94a3; --accent:#2457a6; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#12161c; --card:#1b212a; --ink:#e8ecf1; --muted:#9aa7b6; --line:#2c3440; --used:#4fbf95; --wasted:#e8825f; --pending:#6f7b8a; --accent:#7fa8ea; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width:1080px; margin:0 auto; padding:20px 16px 48px; }
+  h1 { font-size:20px; margin:0 0 2px; }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:28px 0 10px; }
+  .sub { color:var(--muted); margin:0; }
+  .tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; }
+  .tile, .panel { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 14px; }
+  .tile .label { color:var(--muted); font-size:12px; }
+  .tile .value { font-size:24px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .tile .unit { font-size:12px; color:var(--muted); margin-left:3px; }
+  .bar { display:flex; height:22px; border-radius:5px; overflow:hidden; background:var(--line); }
+  .bar div { height:100%; transition:width .4s; }
+  .legend { display:flex; flex-wrap:wrap; gap:16px; margin-top:8px; font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .dot { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; }
+  form { display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; align-items:end; }
+  label { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
+  input, select, button { width:100%; padding:8px 9px; font:inherit; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:6px; }
+  button { background:var(--accent); color:#fff; border-color:var(--accent); cursor:pointer; font-weight:600; }
+  #status { font-size:13px; color:var(--muted); margin-top:8px; min-height:1.3em; }
+  .scroll { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:13px; font-variant-numeric:tabular-nums; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  th { color:var(--muted); font-weight:500; }
+  .used { color:var(--used); font-weight:600; } .wasted { color:var(--wasted); font-weight:600; }
+</style>
+</head>
+<body>
+<main>
+  <h1>PrefetchCache</h1>
+  <p class="sub">Confidence-gated, byte-budgeted server-side prefetching. Live counters since the app started.</p>
+
+  <h2>Prefetching</h2>
+  <div class="tiles">
+    <div class="tile"><div class="label">Useful prefetches per MB</div><div class="value" id="useful_per_mb">–</div></div>
+    <div class="tile"><div class="label">Prefetch precision</div><div class="value" id="precision">–</div></div>
+    <div class="tile"><div class="label">Wasted</div><div class="value"><span id="wasted_mb">–</span><span class="unit">MB</span></div></div>
+    <div class="tile"><div class="label">Cache hit ratio</div><div class="value" id="hit_ratio">–</div></div>
+    <div class="tile"><div class="label">Decision time, p95</div><div class="value"><span id="decision_p95_ms">–</span><span class="unit">ms</span></div></div>
+    <div class="tile"><div class="label">Budget left in bucket</div><div class="value"><span id="budget_tokens">–</span><span class="unit">kB</span></div></div>
+  </div>
+
+  <h2>Prefetched bytes</h2>
+  <div class="panel">
+    <div class="bar" role="img" aria-label="Prefetched bytes split into used, wasted and pending">
+      <div id="bar_used" style="background:var(--used);width:0"></div>
+      <div id="bar_wasted" style="background:var(--wasted);width:0"></div>
+      <div id="bar_pending" style="background:var(--pending);width:0"></div>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--used)"></span>Used <b id="leg_used">0</b> MB</span>
+      <span><span class="dot" style="background:var(--wasted)"></span>Wasted <b id="leg_wasted">0</b> MB</span>
+      <span><span class="dot" style="background:var(--pending)"></span>Not yet decided <b id="leg_pending">0</b> MB</span>
+      <span>Prefetches <b id="prefetches">0</b></span>
+      <span>Skipped by gate <b id="gate_skipped">0</b></span>
+      <span>Skipped by budget <b id="budget_skipped">0</b></span>
+      <span>Requests <b id="requests">0</b></span>
+      <span>Prefetch errors <b id="prefetch_errors">0</b></span>
+    </div>
+  </div>
+
+  <h2>Controls</h2>
+  <div class="panel">
+    <form id="controls">
+      <div><label for="model">Model</label><select id="model"></select></div>
+      <div><label for="policy">Gate</label><select id="policy"><option value="linked">Budget-linked</option><option value="fixed">Fixed threshold</option></select></div>
+      <div><label for="threshold">Fixed threshold (0 to 1, blank = no gate)</label><input id="threshold" type="number" min="0" max="1" step="0.05"></div>
+      <div><label for="top_k">Prefetches per request (0 = off)</label><input id="top_k" type="number" min="0" max="5" step="1"></div>
+      <div><label for="rate">Budget, kB per second</label><input id="rate" type="number" min="0" step="1"></div>
+      <div><label for="burst">Burst, kB</label><input id="burst" type="number" min="1" step="1"></div>
+      <div><button type="submit">Apply</button></div>
+    </form>
+    <div id="status" role="status"></div>
+  </div>
+
+  <h2>Latest prefetch outcomes</h2>
+  <div class="panel scroll">
+    <table><thead><tr><th>Outcome</th><th>Endpoint</th><th>Bytes</th><th>Session</th></tr></thead><tbody id="log"><tr><td colspan="4">No prefetch has been used or wasted yet.</td></tr></tbody></table>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const fmt = (v, d = 2) => (v === null || v === undefined || Number.isNaN(v)) ? "–" : Number(v).toFixed(d);
+let formLoaded = false;
+
+async function loadConfig() {
+  const c = await (await fetch("/prefetchcache/config")).json();
+  $("model").innerHTML = c.models.map(m => `<option${m === c.model ? " selected" : ""}>${m}</option>`).join("");
+  $("policy").value = c.policy;
+  $("threshold").value = c.threshold ?? "";
+  $("top_k").value = c.top_k;
+  $("rate").value = c.budget_bytes_per_second === null ? "" : c.budget_bytes_per_second / 1000;
+  $("burst").value = c.budget_burst_bytes === null ? "" : c.budget_burst_bytes / 1000;
+  formLoaded = true;
+}
+
+async function refresh() {
+  try {
+    const s = await (await fetch("/prefetchcache/stats")).json();
+    $("useful_per_mb").textContent = fmt(s.useful_per_mb, 1);
+    $("precision").textContent = fmt(s.precision);
+    $("wasted_mb").textContent = fmt(s.wasted_mb);
+    $("hit_ratio").textContent = fmt(s.hit_ratio);
+    $("decision_p95_ms").textContent = fmt(s.decision_p95_ms);
+    $("budget_tokens").textContent = s.budget_tokens === null ? "∞" : fmt(s.budget_tokens / 1000, 0);
+    const used = s.useful_bytes, wasted = s.wasted_bytes, pending = s.pending_bytes, total = Math.max(used + wasted + pending, 1);
+    $("bar_used").style.width = 100 * used / total + "%";
+    $("bar_wasted").style.width = 100 * wasted / total + "%";
+    $("bar_pending").style.width = 100 * pending / total + "%";
+    $("leg_used").textContent = fmt(used / 1e6); $("leg_wasted").textContent = fmt(wasted / 1e6); $("leg_pending").textContent = fmt(pending / 1e6);
+    for (const k of ["prefetches", "gate_skipped", "budget_skipped", "requests", "prefetch_errors"]) $(k).textContent = s[k];
+    const log = await (await fetch("/prefetchcache/log?limit=12")).json();
+    if (log.length) {
+      const esc = t => String(t).replace(/[&<>]/g, ch => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[ch]));
+      $("log").innerHTML = log.reverse().map(r => `<tr><td class="${esc(r.outcome)}">${esc(r.outcome)}</td><td>${esc(r.endpoint)}</td><td>${r.bytes}</td><td>${esc(r.session)}</td></tr>`).join("");
+    }
+  } catch (e) { $("status").textContent = "Cannot reach the app."; }
+}
+
+$("controls").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const body = { model: $("model").value, policy: $("policy").value, top_k: Number($("top_k").value) };
+  if ($("threshold").value !== "") body.threshold = Number($("threshold").value);
+  if ($("rate").value !== "") body.budget_bytes_per_second = Number($("rate").value) * 1000;
+  if ($("burst").value !== "") body.budget_burst_bytes = Number($("burst").value) * 1000;
+  const r = await fetch("/prefetchcache/config", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  $("status").textContent = r.ok ? "Applied at " + new Date().toLocaleTimeString() + "." : "Rejected: " + (await r.json()).detail;
+  if (r.ok) loadConfig();
+});
+
+loadConfig().then(refresh);
+setInterval(refresh, 1000);
+</script>
+</body>
+</html>
