@@ -47,24 +47,23 @@ def split_sessions(
 ) -> Split:
     """Split sessions by user.
 
-    If ``manifest`` exists, the split is read from it and never recomputed, so
-    the test set stays frozen. If it does not exist, it is written once.
+    The split is a deterministic function of the user ids and the seed. The
+    manifest records the seed, the size of each part and a checksum of the
+    assignment. If it exists, its seed is used and the recomputed split must
+    match the checksum, so the test set cannot change unnoticed.
     """
     path = Path(manifest) if manifest else None
-    if path and path.exists():
-        saved = json.loads(path.read_text())
-        assignment = saved["users"]
+    saved = json.loads(path.read_text()) if path and path.exists() else None
+    if saved:
+        seed = saved["seed"]
+    assignment = split_users([s.user_id for s in sessions], seed)
+    if saved:
         if _digest(assignment) != saved["sha256"]:
-            raise ValueError(f"split manifest {path} has been modified")
-        known = {u for part in assignment.values() for u in part}
-        missing = {s.user_id for s in sessions} - known
-        if missing:
-            raise ValueError(f"{len(missing)} users are not in the frozen split manifest")
-    else:
-        assignment = split_users([s.user_id for s in sessions], seed)
-        if path:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps({"seed": seed, "sha256": _digest(assignment), "users": assignment}))
+            raise ValueError(f"the split no longer matches the frozen manifest {path}")
+    elif path:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        record = {"seed": seed, "users": {k: len(v) for k, v in assignment.items()}, "sha256": _digest(assignment)}
+        path.write_text(json.dumps(record, indent=1) + "\n")
     part_of = {u: part for part, users in assignment.items() for u in users}
     out: dict[str, list[RawSession]] = {"train": [], "val": [], "test": []}
     for s in sessions:
