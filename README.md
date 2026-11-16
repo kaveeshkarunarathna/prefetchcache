@@ -136,7 +136,17 @@ Useful prefetches per MB, LSTM, top-1:
 | 10% | 217.8 | 212.7 | 232.0 | 53 | 45 | 0.279 | 0.288 |
 | 5% | 287.9 | 278.0 | 280.5 | 27 | 23 | 0.223 | 0.221 |
 
-The budget-linked gate admits a candidate only if its probability per byte is at least a price that rises while the token bucket is below half full and falls while it is above. It gains 6 to 9% over ungated prefetching at the 50, 25 and 10% budgets, matches it at 100%, and is 3% behind at the 5% budget. The fixed 0.5 gate is behind ungated at every budget below 100%. The Transformer follows the same pattern (`results/coffee/models_validation_all_users.csv`). The 95% intervals across runs are wide (about ±18 to ±97 useful per MB) because each run draws different response sizes; a paired comparison per run is still to be done, so these differences are not yet shown to be significant.
+The budget-linked gate admits a candidate only if its probability per byte is at least a price that rises while the token bucket is below half full and falls while it is above. It gains 6 to 9% over ungated prefetching at the 50, 25 and 10% budgets, matches it at 100%, and is 3% behind at the 5% budget. The fixed 0.5 gate is behind ungated at every budget below 100%. The Transformer follows the same pattern (`results/coffee/models_validation_all_users.csv`). Compared run by run (same model seed and response sizes in both arms, five runs, 95% confidence interval of the difference):
+
+| Budget | LSTM: linked minus ungated, useful per MB | Transformer: linked minus ungated, useful per MB | LSTM: hit ratio difference |
+|---|---|---|---|
+| 100% | +0.02 ± 0.04 | +0.02 ± 0.05 | 0.000 |
+| 50% | +6.9 ± 2.2 | +5.5 ± 1.6 | +0.021 ± 0.009 |
+| 25% | +13.6 ± 4.6 | +11.9 ± 3.4 | +0.022 ± 0.011 |
+| 10% | +14.2 ± 8.3 | +9.0 ± 3.2 | +0.009 ± 0.006 |
+| 5% | −7.4 ± 28.7 | −15.5 ± 46.9 | −0.002 ± 0.011 |
+
+The gain at the 50, 25 and 10% budgets is significant for both models and holds in all five runs. At 100% there is no difference, and at 5% the result is inconclusive: the linked gate was ahead in two of five LSTM runs and one of five Transformer runs. The fixed 0.5 gate is never significantly better than ungated prefetching. Full output: `results/coffee/paired_comparison_all_users.txt`.
 
 Full tables are in `results/<dataset>/`.
 
@@ -170,7 +180,8 @@ These are not fixed in the proposal deck. The code uses the proposed value for e
 ## Known limitations so far
 
 - Coffee-shop models have five seeds on all users but untuned hyperparameters; Retailrocket models have one seed and were stopped early.
-- Model seed and response-size draw change together in each run, which inflates the confidence intervals. They need to be separated, with policies compared pairwise per run.
+- Model seed and response-size draw change together in each run, so unpaired confidence intervals are wide; policies are compared pairwise per run instead.
+- The budget-linked gate has no advantage at the tightest (5%) budget. Its step size and target fill are untuned, and a confidence floor has not been tested.
 - Dropping repeated pages removes 56% of coffee-shop requests. Keeping them would make prediction easier and is a decision to confirm.
 - Response sizes are a placeholder distribution until the demo app provides measured sizes.
 - Markov probabilities on Retailrocket are overconfident (precision 0.27 at a 0.7 gate) because many transitions are seen only a few times.
