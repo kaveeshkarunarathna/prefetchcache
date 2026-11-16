@@ -1,0 +1,91 @@
+top1/linked minus top1/ungated: mean difference over runs, 95% CI, runs where the policy is higher
+
+useful_per_mb
+  lstm         100%     +0.0172 ± 0.0416    5/5  not significant
+  lstm          50%     +6.8802 ± 2.2413    5/5  significant
+  lstm          25%    +13.5737 ± 4.5854    5/5  significant
+  lstm          10%    +14.1979 ± 8.2524    5/5  significant
+  lstm           5%     -7.3742 ± 28.7108   2/5  not significant
+  markov1      100%     +0.0339 ± 0.0464    5/5  not significant
+  markov1       50%    +12.2082 ± 5.1173    5/5  significant
+  markov1       25%    +26.3875 ± 11.7664   5/5  significant
+  markov1       10%    +28.9182 ± 35.1373   5/5  not significant
+  markov1        5%    +12.2780 ± 42.3333   3/5  not significant
+  popularity   100%     +0.0081 ± 0.0073    5/5  significant
+  popularity    50%    +14.5192 ± 20.6564   4/5  not significant
+  popularity    25%    +39.4734 ± 46.6760   4/5  not significant
+  popularity    10%    +68.7993 ± 53.9910   4/5  significant
+  popularity     5%   +106.9427 ± 111.2782  4/5  not significant
+  transformer  100%     +0.0195 ± 0.0464    5/5  not significant
+  transformer   50%     +5.4522 ± 1.6445    5/5  significant
+  transformer   25%    +11.9467 ± 3.3527    5/5  significant
+  transformer   10%     +8.9566 ± 3.1621    5/5  significant
+  transformer    5%    -15.4692 ± 46.8704   1/5  not significant
+
+wasted_mb
+  lstm         100%     -0.1020 ± 0.2081    1/5  not significant
+  lstm          50%    -12.4778 ± 10.1911   0/5  significant
+  lstm          25%    -14.1618 ± 15.9527   0/5  not significant
+  lstm          10%     -8.0160 ± 10.9358   1/5  not significant
+  lstm           5%     -3.8891 ± 3.5651    0/5  significant
+  markov1      100%     -0.0637 ± 0.6829    1/5  not significant
+  markov1       50%    -36.2013 ± 109.1584  1/5  not significant
+  markov1       25%    -61.0181 ± 31.3057   0/5  significant
+  markov1       10%    -28.6401 ± 27.7657   1/5  significant
+  markov1        5%    -10.7126 ± 24.9412   2/5  not significant
+  popularity   100%     -0.1448 ± 0.1645    0/5  not significant
+  popularity    50%    +28.2388 ± 18.4982   5/5  significant
+  popularity    25%    +54.8997 ± 80.5433   5/5  not significant
+  popularity    10%    +30.2456 ± 41.1870   5/5  not significant
+  popularity     5%    +17.3127 ± 24.5980   5/5  not significant
+  transformer  100%     +0.0263 ± 0.0993    2/5  not significant
+  transformer   50%     -1.9551 ± 16.6149   3/5  not significant
+  transformer   25%    -13.2948 ± 17.7368   1/5  not significant
+  transformer   10%     -7.8430 ± 13.7544   2/5  not significant
+  transformer    5%     -5.7337 ± 5.8226    0/5  not significant
+
+hit_ratio
+  lstm         100%     +0.0000 ± 0.0001    1/5  not significant
+  lstm          50%     +0.0207 ± 0.0094    5/5  significant
+  lstm          25%     +0.0220 ± 0.0108    5/5  significant
+  lstm          10%     +0.0094 ± 0.0059    5/5  significant
+  lstm           5%     -0.0023 ± 0.0111    2/5  not significant
+  markov1      100%     -0.0000 ± 0.0001    1/5  not significant
+  markov1       50%     +0.0388 ± 0.0234    5/5  significant
+  markov1       25%     +0.0438 ± 0.0295    5/5  significant
+  markov1       10%     +0.0208 ± 0.0328    5/5  not significant
+  markov1        5%     +0.0046 ± 0.0164    3/5  not significant
+  popularity   100%     -0.0000 ± 0.0000    0/5  not significant
+  popularity    50%     +0.0150 ± 0.0194    4/5  not significant
+  popularity    25%     +0.0273 ± 0.0341    4/5  not significant
+  popularity    10%     +0.0213 ± 0.0332    4/5  not significant
+  popularity     5%     +0.0168 ± 0.0264    4/5  not significant
+  transformer  100%     -0.0000 ± 0.0000    0/5  significant
+  transformer   50%     +0.0154 ± 0.0062    5/5  significant
+  transformer   25%     +0.0187 ± 0.0090    5/5  significant
+  transformer   10%     +0.0059 ± 0.0041    5/5  significant
+  transformer    5%     -0.0049 ± 0.0155    1/5  not significant
+top1/gate>=0.5 minus top1/ungated: mean difference over runs, 95% CI, runs where the policy is higher
+
+useful_per_mb
+  lstm         100%     +0.1074 ± 0.6987    4/5  not significant
+  lstm          50%     -3.1197 ± 2.8706    1/5  significant
+  lstm          25%     -3.3068 ± 5.0355    1/5  not significant
+  lstm          10%     -5.1277 ± 7.1415    1/5  not significant
+  lstm           5%     -9.8509 ± 12.4421   1/5  not significant
+  markov1      100%    +19.8226 ± 33.0107   4/5  not significant
+  markov1       50%     +1.2356 ± 35.5267   3/5  not significant
+  markov1       25%    -11.2601 ± 35.7065   3/5  not significant
+  markov1       10%    -23.1332 ± 75.2096   3/5  not significant
+  markov1        5%    -38.4432 ± 104.8241  3/5  not significant
+  popularity   100%    -61.6849 ± 51.8959   0/5  significant
+  popularity    50%    -64.3860 ± 54.0938   0/5  significant
+  popularity    25%    -66.2801 ± 55.6247   0/5  significant
+  popularity    10%    -66.1824 ± 55.5131   0/5  significant
+  popularity     5%    -66.4609 ± 55.7468   0/5  significant
+  transformer  100%     -0.1740 ± 1.2589    1/5  not significant
+  transformer   50%     -3.1229 ± 3.0318    0/5  significant
+  transformer   25%     -3.9037 ± 6.2538    2/5  not significant
+  transformer   10%     -6.4640 ± 11.3524   1/5  not significant
+  transformer    5%    -11.6051 ± 21.8482   1/5  not significant
+
