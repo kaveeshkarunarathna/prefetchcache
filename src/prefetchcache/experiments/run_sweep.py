@@ -16,6 +16,7 @@ from pathlib import Path
 
 from ..data.sizes import lognormal_sizes
 from ..policy.gate import PrefetchPolicy
+from ..policy.linked import BudgetLinkedPolicy
 from ..predictors.baselines import MarkovPredictor, PopularityPredictor
 from ..sim.metrics import mean_ci95
 from ..sim.replay import SimConfig, replay, uses_timestamps
@@ -67,6 +68,7 @@ def main() -> None:
 
     baselines = [PopularityPredictor().fit(train, len(vocab)), MarkovPredictor().fit(train, len(vocab))]
     policies = [PrefetchPolicy(args.top_k, None)] + [PrefetchPolicy(args.top_k, t) for t in args.thresholds]
+    policies.append(BudgetLinkedPolicy(args.top_k))
 
     # runs[(predictor, policy, budget)][metric] -> one value per seed
     runs: dict[tuple[str, str, str], dict[str, list[float]]] = {}
