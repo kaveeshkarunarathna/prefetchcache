@@ -101,19 +101,20 @@ Coffee shop, 10% user sample, one model seed, ungated top-1, unlimited budget (1
 | LSTM | 0.696 | 0.86 | 0.67 | 0.40 ms |
 | Transformer | 0.697 | 0.86 | 0.65 | 0.51 ms |
 
-Retailrocket, all users, first-order Markov: ungated top-1 precision is 0.04, because the next item out of tens of thousands is rarely predictable. A 0.7 gate raises precision to 0.27 and cuts wasted bytes from 805 MB to 3 MB, at almost no gain in hit ratio.
+Retailrocket, all users, one model seed (models stopped at 6 epochs while still improving), top-1:
 
-Budget-linked gate against ungated top-1 with the same LSTM (coffee shop, same run):
+| Predictor | Policy | Prefetch precision | Useful per MB | Wasted MB | Hit ratio |
+|---|---|---|---|---|---|
+| No prefetching | | | | | 0.170 |
+| First-order Markov | ungated, 100% budget | 0.040 | 4.6 | 661 | 0.190 |
+| LSTM | ungated, 100% budget | 0.024 | 2.4 | 834 | 0.183 |
+| Transformer | ungated, 100% budget | 0.028 | 2.8 | 833 | 0.185 |
+| First-order Markov | fixed gate 0.5 | 0.164 | 12.6 | 27 | 0.173 |
+| LSTM | fixed gate 0.5 | 0.277 | 24.5 | 8 | 0.172 |
+| Transformer | fixed gate 0.5 | 0.210 | 16.3 | 15 | 0.172 |
+| LSTM | budget-linked, 5% budget | 0.051 | 7.9 | 49 | 0.173 |
 
-| Budget | Useful per MB, ungated | Useful per MB, linked | Wasted MB, ungated | Wasted MB, linked | Hit ratio, ungated | Hit ratio, linked |
-|---|---|---|---|---|---|---|
-| 100% | 77.0 | 77.1 | 262.6 | 261.5 | 0.671 | 0.671 |
-| 50% | 108.2 | 112.8 | 145.9 | 138.3 | 0.531 | 0.543 |
-| 25% | 145.1 | 150.5 | 81.1 | 74.6 | 0.390 | 0.394 |
-| 10% | 172.0 | 183.4 | 33.9 | 30.5 | 0.243 | 0.245 |
-| 5% | 171.5 | 189.7 | 25.0 | 16.6 | 0.178 | 0.182 |
-
-The linked gate admits a candidate only if its probability per byte is at least a price that rises while the token bucket is below half full and falls while it is above. It matches ungated prefetching when the budget is loose and gains 4 to 11% in useful prefetches per MB as the budget tightens, without losing hit ratio. Fixed thresholds of 0.5 and 0.7 do not achieve this: they lose hit ratio at loose budgets.
+Predicting the next item out of about 38,000 is rarely right, so ungated prefetching wastes almost everything and the neural models do not beat Markov. A fixed confidence gate removes over 95% of the waste. The budget-linked gate without a confidence floor does not help here (7.9 against 8.7 useful per MB for ungated at the 5% budget): when almost every candidate is unlikely, price per byte alone is not enough. Combining the linked gate with a confidence floor is the next thing to test. Decision time with this vocabulary was 3.3 ms (LSTM) and 2.6 ms (Transformer) at p95, measured on a busy machine.
 
 Full tables are in `results/<dataset>/`.
 

@@ -1,0 +1,3 @@
+
+[exited with code 0]
+Measured while another training job was using all CPU cores.
