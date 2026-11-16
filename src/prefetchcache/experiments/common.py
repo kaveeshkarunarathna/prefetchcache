@@ -1,6 +1,7 @@
 """Dataset loading shared by training and sweep scripts."""
 from __future__ import annotations
 
+import zlib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -20,7 +21,13 @@ class Dataset:
     n_test_sessions: int  # the test split itself is only loaded by the final experiments
 
 
-def load_dataset(name: str, path: str | None, min_count: int, results_dir: str | Path) -> Dataset:
+def keep_user(user_id: str, fraction: float) -> bool:
+    """Deterministic user subsample for development runs."""
+    return fraction >= 1.0 or zlib.crc32(user_id.encode()) % 10_000 < fraction * 10_000
+
+
+def load_dataset(name: str, path: str | None, min_count: int, results_dir: str | Path, user_sample: float = 1.0) -> Dataset:
+    """Load, split by user against the frozen manifest, then optionally subsample users."""
     if name == "synthetic":
         raw = make_synthetic(seed=0)
     elif name == "coffee":
@@ -31,5 +38,7 @@ def load_dataset(name: str, path: str | None, min_count: int, results_dir: str |
         raise ValueError(name)
     manifest = Path(results_dir) / name / "split_manifest.json"
     split = split_sessions(raw, seed=0, manifest=manifest)
-    vocab = Vocab.fit(split.train, min_count=min_count)
-    return Dataset(name, vocab, vocab.encode(split.train), vocab.encode(split.val), len(split.test))
+    train = [s for s in split.train if keep_user(s.user_id, user_sample)]
+    val = [s for s in split.val if keep_user(s.user_id, user_sample)]
+    vocab = Vocab.fit(train, min_count=min_count)
+    return Dataset(name, vocab, vocab.encode(train), vocab.encode(val), len(split.test))
