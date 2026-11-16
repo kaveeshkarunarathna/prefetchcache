@@ -1,23 +1,35 @@
 import pandas as pd
 import pytest
 
-from prefetchcache.data.coffee import load_coffee, parse_spmf_sequence
+from prefetchcache.data.coffee import load_coffee, parse_token, split_visits
 from prefetchcache.data.retailrocket import sessions_from_events
 from prefetchcache.data.sessions import RawSession, Vocab
 from prefetchcache.data.split import split_sessions
 from prefetchcache.data.synthetic import make_synthetic
 
 
-def test_spmf_parsing(tmp_path):
-    assert parse_spmf_sequence("3 -1 7 -1 3 -1 -2") == [3, 7, 3]
-    f = tmp_path / "seq.txt"
-    f.write_text("1 -1 2 -1 -2\n5 -1 -2\n\n4 -1 4 -1 9 -1 -2\n")
+def _tok(user, page, weekday, hour):
+    return f"{user:07d}{page:03d}{weekday:02d}{hour:02d}"
+
+
+def test_coffee_token_and_visit_split(tmp_path):
+    assert parse_token("00000530010123") == ("0000053", 1, 23)
+    assert split_visits([23, 23, 24, 30, 31, 5]) == [(0, 3), (3, 5), (5, 6)]
+    assert split_visits([167, 0]) == [(0, 2)]  # Sunday 23:00 to Monday 00:00 is continuous
+    line1 = [_tok(53, 1, 1, 23), _tok(53, 2, 1, 23), _tok(53, 2, 2, 0), _tok(53, 3, 2, 0),  # one visit, page 2 repeated
+             _tok(53, 4, 3, 9), _tok(53, 5, 3, 9)]  # second visit, a day later
+    line2 = [_tok(7, 1, 5, 10)]  # too short
+    f = tmp_path / "coffee"
+    f.write_text("".join(" -1 ".join(l) + " -1 -2\n" for l in (line1, line2)))
     sessions = load_coffee(f)
     assert [s.endpoints for s in sessions] == [
-        ("GET /pages/1", "GET /pages/2"),
-        ("GET /pages/4", "GET /pages/4", "GET /pages/9"),
-    ]  # single-page sequence dropped
-    assert all(s.times is None for s in sessions)
+        ("GET /pages/1", "GET /pages/2", "GET /pages/3"),
+        ("GET /pages/4", "GET /pages/5"),
+    ]
+    assert {s.user_id for s in sessions} == {"0000053"} and all(s.times is None for s in sessions)
+    raw = load_coffee(f, split_on_time_gap=False, collapse_repeated_pages=False)
+    assert len(raw) == 1 and len(raw[0].endpoints) == 6
+    assert load_coffee(f, max_length=2)[0].endpoints == ("GET /pages/4", "GET /pages/5")
 
 
 def test_retailrocket_sessionisation():
@@ -56,7 +68,6 @@ def test_split_is_user_level_and_frozen(tmp_path):
     # A different seed must not change a frozen split.
     b = split_sessions(sessions, seed=99, manifest=manifest)
     assert [s.session_id for s in b.test] == [s.session_id for s in a.test]
-    # Tampering is detected.
-    manifest.write_text(manifest.read_text().replace('"u0"', '"uX"'))
+    # A changed user population no longer matches the frozen manifest.
     with pytest.raises(ValueError):
-        split_sessions(sessions, manifest=manifest)
+        split_sessions(sessions[5:], manifest=manifest)
