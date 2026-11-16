@@ -18,5 +18,8 @@ class PrefetchPolicy:
         gate = "ungated" if self.threshold is None else f"gate>={self.threshold:g}"
         return f"top{self.top_k}/{gate}"
 
+    def fresh(self) -> "PrefetchPolicy":
+        return self  # stateless
+
     def passes(self, probability: float) -> bool:
         return self.threshold is None or probability >= self.threshold
