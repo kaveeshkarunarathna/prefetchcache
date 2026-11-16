@@ -116,6 +116,25 @@ Retailrocket, all users, one model seed (models stopped at 6 epochs while still 
 
 Predicting the next item out of about 38,000 is rarely right, so ungated prefetching wastes almost everything and the neural models do not beat Markov. A fixed confidence gate removes over 95% of the waste. The budget-linked gate without a confidence floor does not help here (7.9 against 8.7 useful per MB for ungated at the 5% budget): when almost every candidate is unlikely, price per byte alone is not enough. Combining the linked gate with a confidence floor is the next thing to test. Decision time with this vocabulary was 3.3 ms (LSTM) and 2.6 ms (Transformer) at p95, measured on a busy machine.
 
+Coffee shop, models trained on all users, five seeds, replayed on 20% of validation users (mean of five runs; each run also draws new placeholder response sizes):
+
+| Model | Next-page accuracy | Training time | Decision p95 |
+|---|---|---|---|
+| LSTM | 0.6949 ± 0.0016 | 7.8 min | 0.13 ms |
+| Transformer | 0.6970 ± 0.0016 | 46 min | 0.23 ms |
+
+Useful prefetches per MB, LSTM, top-1:
+
+| Budget | Ungated | Fixed gate 0.5 | Budget-linked | Wasted MB, ungated | Wasted MB, linked | Hit ratio, ungated | Hit ratio, linked |
+|---|---|---|---|---|---|---|---|
+| 100% | 81.6 | 81.7 | 81.6 | 435 | 435 | 0.684 | 0.684 |
+| 50% | 115.0 | 111.9 | 121.9 | 215 | 202 | 0.536 | 0.557 |
+| 25% | 152.1 | 148.8 | 165.7 | 117 | 103 | 0.396 | 0.418 |
+| 10% | 217.8 | 212.7 | 232.0 | 53 | 45 | 0.279 | 0.288 |
+| 5% | 287.9 | 278.0 | 280.5 | 27 | 23 | 0.223 | 0.221 |
+
+The budget-linked gate admits a candidate only if its probability per byte is at least a price that rises while the token bucket is below half full and falls while it is above. It gains 6 to 9% over ungated prefetching at the 50, 25 and 10% budgets, matches it at 100%, and is 3% behind at the 5% budget. The fixed 0.5 gate is behind ungated at every budget below 100%. The Transformer follows the same pattern (`results/coffee/models_validation_all_users.csv`). The 95% intervals across runs are wide (about ±18 to ±97 useful per MB) because each run draws different response sizes; a paired comparison per run is still to be done, so these differences are not yet shown to be significant.
+
 Full tables are in `results/<dataset>/`.
 
 ## Metric definitions
@@ -147,7 +166,8 @@ These are not fixed in the proposal deck. The code uses the proposed value for e
 
 ## Known limitations so far
 
-- Model runs so far use one seed, a 10% user sample of the coffee-shop data and untuned hyperparameters. The five-seed runs on all users are outstanding.
+- Coffee-shop models have five seeds on all users but untuned hyperparameters; Retailrocket models have one seed and were stopped early.
+- Model seed and response-size draw change together in each run, which inflates the confidence intervals. They need to be separated, with policies compared pairwise per run.
 - Dropping repeated pages removes 56% of coffee-shop requests. Keeping them would make prediction easier and is a decision to confirm.
 - Response sizes are a placeholder distribution until the demo app provides measured sizes.
 - Markov probabilities on Retailrocket are overconfident (precision 0.27 at a 0.7 gate) because many transitions are seen only a few times.
