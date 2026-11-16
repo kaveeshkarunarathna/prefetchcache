@@ -137,9 +137,9 @@ Retailrocket, all users, one model seed (models stopped at 6 epochs while still 
 | First-order Markov | fixed gate 0.5 | 0.164 | 12.6 | 27 | 0.173 |
 | LSTM | fixed gate 0.5 | 0.277 | 24.5 | 8 | 0.172 |
 | Transformer | fixed gate 0.5 | 0.210 | 16.3 | 15 | 0.172 |
-| LSTM | budget-linked, 5% budget | 0.051 | 7.9 | 49 | 0.173 |
+| LSTM | budget-linked, 5% budget | 0.046 | 5.9 | 52 | 0.172 |
 
-Predicting the next item out of about 38,000 is rarely right, so ungated prefetching wastes almost everything and the neural models do not beat Markov. A fixed confidence gate removes over 95% of the waste. The budget-linked gate without a confidence floor does not help here (7.9 against 8.7 useful per MB for ungated at the 5% budget): when almost every candidate is unlikely, price per byte alone is not enough. Combining the linked gate with a confidence floor is the next thing to test. Decision time with this vocabulary was 3.3 ms (LSTM) and 2.6 ms (Transformer) at p95, measured on a busy machine.
+Predicting the next item out of about 38,000 is rarely right, so ungated prefetching wastes almost everything and the neural models do not beat Markov. A fixed confidence gate removes over 95% of the waste. The budget-linked gate without a confidence floor does not help here (5.9 against 8.7 useful per MB for ungated at the 5% budget): when almost every candidate is unlikely, price per byte alone is not enough. Combining the linked gate with a confidence floor is the next thing to test. Decision time with this vocabulary was 3.3 ms (LSTM) and 2.6 ms (Transformer) at p95, measured on a busy machine.
 
 Coffee shop, models trained on all users, five seeds, replayed on 20% of validation users (mean of five runs; each run also draws new placeholder response sizes):
 
