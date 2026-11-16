@@ -1,0 +1,6 @@
+__pycache__/
+*.egg-info/
+.pytest_cache/
+# Datasets are not redistributed (coffee-shop data is GPL-2, Retailrocket is CC BY-NC-SA 4.0)
+data/raw/
+data/processed/
