@@ -118,7 +118,7 @@ def replay(
             else:
                 ranked = predictor.predict(history, config.top_n_candidates)
             if linked:
-                policy.observe(bucket.available(now) / bucket.capacity if bucket is not None else 1.0)
+                policy.observe(bucket.available(now) / bucket.capacity if bucket is not None else 1.0, now)
             chosen = 0
             for cand, prob in ranked:
                 if chosen >= policy.top_k:

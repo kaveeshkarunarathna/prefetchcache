@@ -57,6 +57,7 @@ class PrefetchEngine:
         self.model = model
         self.policy = policy
         self.bucket = bucket
+        self.linked_step = policy.step if isinstance(policy, BudgetLinkedPolicy) else 0.3  # per second
         self.ttl = ttl_seconds
         self.history_length = history_length
         self.max_sessions = max_sessions
@@ -143,7 +144,7 @@ class PrefetchEngine:
         now = self.clock()
         linked = isinstance(policy, BudgetLinkedPolicy)
         if linked:
-            policy.observe(self.bucket.available(now) / self.bucket.capacity if self.bucket else 1.0)
+            policy.observe(self.bucket.available(now) / self.bucket.capacity if self.bucket else 1.0, now)
         chosen = 0
         for candidate, probability in ranked:
             if chosen >= policy.top_k:
@@ -262,7 +263,7 @@ class PrefetchEngine:
             floor = min_confidence if min_confidence is not None else (current["min_confidence"] or 0.0)
             if not isinstance(self.policy, BudgetLinkedPolicy) or top_k is not None or min_confidence is not None:
                 price = self.policy.price if isinstance(self.policy, BudgetLinkedPolicy) else 0.0
-                self.policy = BudgetLinkedPolicy(k, floor, price=price)
+                self.policy = BudgetLinkedPolicy(k, floor, step=self.linked_step, price=price)
         else:
             t = threshold if threshold is not None else current["threshold"]
             self.policy = PrefetchPolicy(k, t)

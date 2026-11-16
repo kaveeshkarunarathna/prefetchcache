@@ -7,6 +7,7 @@ Environment:
     REDIS_URL        e.g. redis://localhost:6379/0; an in-process store is used if unset
     POLICY           linked (default), fixed or off
     THRESHOLD        confidence threshold for the fixed policy (default 0.5)
+    LINKED_STEP_PER_SECOND   how fast the budget-linked price moves (default 0.3)
     BUDGET_BYTES_PER_SECOND, BUDGET_BURST_BYTES   token bucket (default 20000 / 200000)
     TTL_SECONDS      cache expiry (default 60)
 """
@@ -51,7 +52,8 @@ def make_store():
 def make_policy():
     kind = os.environ.get("POLICY", "linked")
     if kind == "linked":
-        return BudgetLinkedPolicy(top_k=1)
+        # Seconds are the clock here: let the price move by about 30% per second at most.
+        return BudgetLinkedPolicy(top_k=1, step=float(os.environ.get("LINKED_STEP_PER_SECOND", "0.3")))
     if kind == "fixed":
         return PrefetchPolicy(1, float(os.environ.get("THRESHOLD", "0.5")))
     if kind == "off":
