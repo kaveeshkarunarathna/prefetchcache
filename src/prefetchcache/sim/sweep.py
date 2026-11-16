@@ -39,7 +39,7 @@ def budget_sweep(
     predictor: Predictor,
     sizes: np.ndarray,
     cacheable: Sequence[bool],
-    policy: PrefetchPolicy,
+    policy,
     config: SimConfig,
     fractions: Sequence[float] = DEFAULT_BUDGET_FRACTIONS,
     burst_units: float = 20.0,
@@ -48,5 +48,5 @@ def budget_sweep(
     out: dict[float, Metrics] = {}
     for f in fractions:
         bucket = make_bucket(f, ref, sessions, sizes, burst_units)
-        out[f] = replay(sessions, predictor, sizes, cacheable, policy, config, bucket)
+        out[f] = replay(sessions, predictor, sizes, cacheable, policy.fresh(), config, bucket)
     return out

@@ -65,7 +65,7 @@ def replay(
     predictor: Predictor | None,
     sizes: np.ndarray,
     cacheable: Sequence[bool],
-    policy: PrefetchPolicy,
+    policy,
     config: SimConfig,
     bucket: TokenBucket | None = None,
     prefetch_log: list[dict] | None = None,
@@ -81,6 +81,7 @@ def replay(
 
     cache = SessionCache(config.cache_capacity_bytes, on_remove)
     do_prefetch = predictor is not None and policy.top_k > 0
+    linked = hasattr(policy, "admit")  # budget-linked gate: decision depends on size and bucket fill
 
     for now, si, pos in event_stream(sessions):
         session = sessions[si]
@@ -116,20 +117,26 @@ def replay(
                 m.decision_ms.append((time.perf_counter() - t0) * 1000)
             else:
                 ranked = predictor.predict(history, config.top_n_candidates)
+            if linked:
+                policy.observe(bucket.available(now) / bucket.capacity if bucket is not None else 1.0)
             chosen = 0
             for cand, prob in ranked:
                 if chosen >= policy.top_k:
                     break
                 if not cacheable[cand]:
                     continue
-                if not policy.passes(prob):
+                size = int(sizes[cand])
+                if linked:
+                    if not policy.admit(prob, size):
+                        m.gate_skipped += 1
+                        continue  # a smaller, less likely candidate may still be worth its bytes
+                elif not policy.passes(prob):
                     m.gate_skipped += 1
                     break  # ranked by probability, so the rest fail too
                 chosen += 1
                 if cache.get((si, cand), now) is not None:
                     m.already_cached += 1
                     continue
-                size = int(sizes[cand])
                 if bucket is not None and not bucket.try_consume(size, now):
                     m.budget_skipped += 1
                     continue

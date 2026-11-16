@@ -6,6 +6,7 @@ from prefetchcache.data.split import split_sessions
 from prefetchcache.data.synthetic import make_synthetic
 from prefetchcache.policy.budget import TokenBucket
 from prefetchcache.policy.gate import PrefetchPolicy
+from prefetchcache.policy.linked import BudgetLinkedPolicy
 from prefetchcache.predictors.baselines import MarkovPredictor, PopularityPredictor
 from prefetchcache.sim.cache import SessionCache
 from prefetchcache.sim.metrics import mean_ci95
@@ -134,3 +135,19 @@ def test_timestamp_replay_matches_invariants():
 def test_mean_ci95():
     mean, ci = mean_ci95([1.0, 2.0, 3.0, 4.0, 5.0])
     assert mean == 3.0 and abs(ci - 2.776 * (2.5**0.5) / 5**0.5) < 1e-9
+
+
+def test_linked_gate_respects_budget_and_balances():
+    vocab, train, val = _fitted()
+    sizes = lognormal_sizes(len(vocab), seed=0)
+    pred = MarkovPredictor().fit(train, len(vocab))
+    config = SimConfig(ttl=5)
+    ref = reference_bytes(val, pred, sizes, vocab.cacheable, 1, config)
+    linked = budget_sweep(val, pred, sizes, vocab.cacheable, BudgetLinkedPolicy(1), config)
+    ungated = budget_sweep(val, pred, sizes, vocab.cacheable, PrefetchPolicy(1), config)
+    n = sum(len(s.endpoints) for s in val)
+    for fraction, m in linked.items():
+        assert m.prefetched_bytes == m.useful_bytes + m.wasted_bytes
+        rate = fraction * ref / n
+        assert m.prefetched_bytes <= rate * n + max(rate * 20, sizes.max()) + 1e-6
+    assert linked[0.1].useful_per_mb > ungated[0.1].useful_per_mb
