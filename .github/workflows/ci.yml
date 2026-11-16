@@ -9,5 +9,5 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install torch --index-url https://download.pytorch.org/whl/cpu
-      - run: pip install -e ".[dev,train]"
+      - run: pip install -e ".[dev,train,serve]"
       - run: pytest -q
