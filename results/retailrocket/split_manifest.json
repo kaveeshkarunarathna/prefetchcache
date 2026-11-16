@@ -1,0 +1,9 @@
+{
+ "seed": 0,
+ "users": {
+  "train": 220948,
+  "val": 47346,
+  "test": 47346
+ },
+ "sha256": "5fb6daccf88565d532df8265768b29cbd3337629cfaee1fedb0f8077b3de195a"
+}
