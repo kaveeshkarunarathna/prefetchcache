@@ -1,0 +1,2 @@
+transformer  params=   72673  p50=0.181 ms  worst p95 of 3 runs=0.229 ms  PASS (limit 5 ms)
+
