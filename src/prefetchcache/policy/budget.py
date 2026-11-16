@@ -35,3 +35,13 @@ class TokenBucket:
         self.tokens -= n_bytes
         self.granted_bytes += n_bytes
         return True
+
+    def charge(self, n_bytes: int, now: float) -> None:
+        """Charge bytes that were already transferred, going into debt if needed.
+
+        Used when a prefetched response turns out larger than its known size;
+        the debt delays later prefetches, so the long-run rate still holds.
+        """
+        self._refill(now)
+        self.tokens -= n_bytes
+        self.granted_bytes += n_bytes
