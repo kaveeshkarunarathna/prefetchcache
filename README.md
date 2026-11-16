@@ -201,7 +201,7 @@ These are not fixed in the proposal deck. The code uses the proposed value for e
 
 ## Known limitations so far
 
-- The live app has only been exercised with short replays, not a controlled load test. In one replay of 400 validation sessions at a 30 kB/s budget, ungated prefetching gave more useful prefetches per MB than the budget-linked gate (510 against 325), the opposite of the simulator. The linked gate's price is updated once per decision, which suits the simulator's request clock but reacts too fast under concurrent real-time traffic; it needs a time-based update.
+- The live app has only been exercised with short replays, not a controlled load test. A first replay showed the budget-linked gate over-tightening under concurrent traffic because its price moved once per decision; it now moves with elapsed time. After that change, two replays of 400 validation sessions at a 30 kB/s budget gave 599 and 547 useful prefetches per MB for the linked gate against 559 and 519 for ungated. Two repetitions are not a result; the Locust test (O4) has to confirm it.
 
 - Coffee-shop models have five seeds on all users but untuned hyperparameters; Retailrocket models have one seed and were stopped early.
 - Model seed and response-size draw change together in each run, so unpaired confidence intervals are wide; policies are compared pairwise per run instead.
