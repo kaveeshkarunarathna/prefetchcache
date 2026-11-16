@@ -61,6 +61,8 @@ def train_model(
     model = build_model(kind, n_endpoints, max_len)
     xt, yt = make_windows(train, max_len, model.pad_id)
     xv, yv = make_windows(val, max_len, model.pad_id)
+    # Keep the sampled validation logits within about 800 MB for large vocabularies.
+    calibration_sample = min(calibration_sample, max(1_000, 200_000_000 // n_endpoints))
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     loss_fn = nn.CrossEntropyLoss()
     best, best_state, stale = float("inf"), None, 0
