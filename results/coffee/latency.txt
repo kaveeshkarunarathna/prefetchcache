@@ -1,0 +1,2 @@
+lstm         params=  104024  p50=0.091 ms  worst p95 of 3 runs=0.399 ms  PASS (limit 5 ms)
+transformer  params=   71512  p50=0.182 ms  worst p95 of 3 runs=0.508 ms  PASS (limit 5 ms)
