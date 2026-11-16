@@ -111,6 +111,13 @@ def main() -> None:
                 mean, ci = mean_ci95(vals[k])
                 row += [f"{mean:.4f}", f"{ci:.4f}"]
             w.writerow(row)
+    # One row per run, so policies can be compared pairwise within a run.
+    with open(out_dir / csv_name.replace(".csv", "_runs.csv"), "w", newline="") as fh:
+        w = csv.writer(fh)
+        w.writerow(["predictor", "policy", "budget", "seed", *REPORTED])
+        for key, vals in runs.items():
+            for seed in range(len(vals[REPORTED[0]])):
+                w.writerow([*key, seed, *[f"{vals[k][seed]:.6f}" for k in REPORTED]])
     print(f"wrote {out_dir / csv_name}")
 
     print(f"\n{'predictor':<13}{'policy':<16}{'budget':>7}{'useful/MB':>11}{'precision':>11}{'wasted MB':>11}{'hit ratio':>11}")
