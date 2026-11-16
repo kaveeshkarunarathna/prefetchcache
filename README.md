@@ -13,8 +13,8 @@ Supervisor: Ms Sapna Kumarapathirage.
 | M1 | WP2 | Data loaders, user-level split, baselines, replay simulator, precision-per-byte metrics, budget sweep | Done |
 | M2 | WP2 | Real coffee-shop and Retailrocket data: loader checks, data profile, frozen test split, baselines on validation data | Done |
 | M3 | WP3 | LSTM and small Transformer in PyTorch, temperature scaling, ONNX export, latency benchmark (NFR1) | Built; first single-seed runs on real data; tuning and five-seed runs outstanding |
-| M4 | WP4 | Budget-linked gate built and tested in the simulator. Next: FastAPI middleware, Redis key scheme, prefetch log, admin API (FR2 to FR5, NFR2, NFR3) | |
-| M5 | WP5 | Demo app, measured response sizes, React dashboard, Docker Compose, Locust load test (O4) | |
+| M4 | WP4 | Budget-linked gate; FastAPI middleware with per-session Redis keys, token bucket, used/wasted prefetch log and admin API; requirement tests for FR2 to FR5, NFR2, NFR3 | Done; not yet run against a real Redis server or under load |
+| M5 | WP5 | Next: demo app, measured response sizes, React dashboard, Docker Compose, Locust load test (O4) | |
 | M6 | WP6 | RQ1 to RQ3 experiments on the frozen test split, five seeds, 95% confidence intervals | |
 
 ## Layout
@@ -41,13 +41,16 @@ src/prefetchcache/
                  replay.py     request flow of deck slide 8
                  metrics.py    useful prefetches per MB, wasted bytes, precision, hit ratio
                  sweep.py      replay at five byte budgets
+  middleware/    store.py      per-session cache keys; memory and Redis stores
+                 engine.py     serve first, then predict, gate, budget, prefetch, log used/wasted
+                 app.py        FastAPI middleware and admin API (/prefetchcache/stats, /config, /log)
   experiments/   run_sweep.py  budget sweep for baselines and exported models
                  latency.py    decision-latency benchmark against the 5 ms limit
+                 compare.py    paired comparison of two policies across runs
 tests/           pytest suite; runs in GitHub Actions on every push
 ```
 
-Planned: `middleware/`
-(FastAPI + Redis), `demo/` (shop API and dashboard), `loadtest/` (Locust).
+Planned: `demo/` (shop API and dashboard), `loadtest/` (Locust).
 
 ## Run
 
