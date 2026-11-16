@@ -151,3 +151,15 @@ def test_linked_gate_respects_budget_and_balances():
         rate = fraction * ref / n
         assert m.prefetched_bytes <= rate * n + max(rate * 20, sizes.max()) + 1e-6
     assert linked[0.1].useful_per_mb > ungated[0.1].useful_per_mb
+
+
+def test_paired_differences_pair_within_run():
+    from prefetchcache.experiments.compare import paired_differences
+
+    rows = [
+        {"predictor": "lstm", "policy": p, "budget": "50%", "seed": str(s), "useful_per_mb": str(v)}
+        for s, (a, b) in enumerate([(100, 110), (200, 212), (50, 55)])
+        for p, v in (("top1/ungated", a), ("top1/linked", b))
+    ]
+    diffs = paired_differences(rows, "top1/linked", "top1/ungated", "useful_per_mb")
+    assert diffs == {("lstm", "50%"): [10.0, 12.0, 5.0]}
