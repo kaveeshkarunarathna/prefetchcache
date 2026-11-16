@@ -3,7 +3,9 @@
 Both take the same input: the last ``max_len`` endpoint ids of a session,
 left-padded with a PAD id, shape [batch, max_len]. Both return logits over
 the next endpoint at every position, shape [batch, max_len, n_endpoints].
-The serving path reads the last position only.
+The serving path reads the last position only. ``features`` returns the
+hidden states before the output layer, so training can score only the
+non-padded positions (this matters for vocabularies of tens of thousands).
 """
 from __future__ import annotations
 
@@ -20,9 +22,12 @@ class LSTMNet(nn.Module):
         self.lstm = nn.LSTM(emb, hidden, num_layers=layers, batch_first=True)
         self.out = nn.Linear(hidden, n_endpoints)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def features(self, x: torch.Tensor) -> torch.Tensor:
         h, _ = self.lstm(self.drop(self.embed(x)))
-        return self.out(self.drop(h))
+        return self.drop(h)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.out(self.features(x))
 
 
 class TransformerNet(nn.Module):
@@ -41,10 +46,12 @@ class TransformerNet(nn.Module):
         self.register_buffer("positions", torch.arange(max_len).unsqueeze(0), persistent=False)
         self.register_buffer("causal", torch.triu(torch.full((max_len, max_len), float("-inf")), diagonal=1), persistent=False)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def features(self, x: torch.Tensor) -> torch.Tensor:
         h = self.drop(self.embed(x) + self.pos(self.positions))
-        h = self.encoder(h, mask=self.causal)
-        return self.out(self.norm(h))
+        return self.norm(self.encoder(h, mask=self.causal))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.out(self.features(x))
 
 
 def build_model(kind: str, n_endpoints: int, max_len: int = 20) -> nn.Module:
