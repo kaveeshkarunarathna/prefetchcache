@@ -14,7 +14,7 @@ Supervisor: Ms Sapna Kumarapathirage.
 | M2 | WP2 | Real coffee-shop and Retailrocket data: loader checks, data profile, frozen test split, baselines on validation data | Done |
 | M3 | WP3 | LSTM and small Transformer in PyTorch, temperature scaling, ONNX export, latency benchmark (NFR1) | Built; first single-seed runs on real data; tuning and five-seed runs outstanding |
 | M4 | WP4 | Budget-linked gate; FastAPI middleware with per-session Redis keys, token bucket, used/wasted prefetch log and admin API; requirement tests for FR2 to FR5, NFR2, NFR3 | Done; not yet run against a real Redis server or under load |
-| M5 | WP5 | Next: demo app, measured response sizes, React dashboard, Docker Compose, Locust load test (O4) | |
+| M5 | WP5 | Demo shop API behind the middleware, live dashboard with runtime controls, HTTP session replay, Docker Compose with Redis | Running; Locust load test (O4) and simulator runs with the demo's response sizes outstanding |
 | M6 | WP6 | RQ1 to RQ3 experiments on the frozen test split, five seeds, 95% confidence intervals | |
 
 ## Layout
@@ -47,10 +47,32 @@ src/prefetchcache/
   experiments/   run_sweep.py  budget sweep for baselines and exported models
                  latency.py    decision-latency benchmark against the 5 ms limit
                  compare.py    paired comparison of two policies across runs
+  demo/          backend.py    coffee-shop API, one GET endpoint per app page
+                 app.py        API + middleware + dashboard, configured by environment variables
+                 dashboard.html  live counters and controls for model, gate and budget
+                 replay.py     replays sessions over HTTP and reports response times
+models/coffee/   exported LSTM and Transformer (seed 0, trained on all training users)
 tests/           pytest suite; runs in GitHub Actions on every push
 ```
 
-Planned: `demo/` (shop API and dashboard), `loadtest/` (Locust).
+Planned: `loadtest/` (Locust).
+
+## Demo application
+
+![Dashboard](docs/dashboard.png)
+
+```
+docker compose up --build          # app on http://localhost:8000, with Redis
+python -m prefetchcache.demo.replay --sessions 300      # send traffic; watch the dashboard
+```
+
+Without Docker: `pip install -e ".[serve]"`, then `uvicorn prefetchcache.demo.app:app --port 8000` (uses an in-process cache unless `REDIS_URL` is set).
+
+- `GET /pages/{n}` is the shop API. Requests carry a session id in the `X-Session-Id` header; the response header `X-PrefetchCache` says `hit` or `miss`.
+- `/dashboard` shows useful prefetches per MB, precision, wasted bytes, hit ratio, decision time and the budget, and changes model, gate, threshold and budget while the app runs.
+- `/prefetchcache/stats`, `/config`, `/log`, `/reset` and `/sizes` are the admin API.
+
+The dataset identifies pages only by number, so the demo returns generated catalogue JSON with a fixed size per page (142 bytes to 17.9 kB, median 1.3 kB; `results/coffee/demo_response_sizes.json`) and a simulated backend delay. A prefetch is only issued for an endpoint whose response size has already been observed, so it can be charged to the budget before it is fetched.
 
 ## Run
 
@@ -178,6 +200,8 @@ These are not fixed in the proposal deck. The code uses the proposed value for e
 | Success criteria | The gated policy gives more useful prefetches per MB than ungated top-k at every budget, with at most 10% relative loss in hit ratio; decision time at or below 5 ms p95 | to be fixed before testing |
 
 ## Known limitations so far
+
+- The live app has only been exercised with short replays, not a controlled load test. In one replay of 400 validation sessions at a 30 kB/s budget, ungated prefetching gave more useful prefetches per MB than the budget-linked gate (510 against 325), the opposite of the simulator. The linked gate's price is updated once per decision, which suits the simulator's request clock but reacts too fast under concurrent real-time traffic; it needs a time-based update.
 
 - Coffee-shop models have five seeds on all users but untuned hyperparameters; Retailrocket models have one seed and were stopped early.
 - Model seed and response-size draw change together in each run, so unpaired confidence intervals are wide; policies are compared pairwise per run instead.
