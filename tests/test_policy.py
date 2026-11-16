@@ -43,3 +43,14 @@ def test_linked_gate_price_follows_bucket_fill():
     assert policy.price < start and policy.admit(0.05, 1000)
     assert policy.fresh().price == start
     assert not BudgetLinkedPolicy(min_confidence=0.5, price=1e-9).admit(0.4, 100)
+
+
+def test_linked_gate_price_moves_with_time_not_with_call_count():
+    burst = BudgetLinkedPolicy(reference_bytes=1000)
+    steady = BudgetLinkedPolicy(reference_bytes=1000)
+    burst.observe(0.0, now=0.0)
+    steady.observe(0.0, now=0.0)
+    for _ in range(500):
+        burst.observe(0.0, now=10.0)  # 500 decisions in the same instant
+    steady.observe(0.0, now=10.0)
+    assert abs(burst.price - steady.price) < 1e-12
